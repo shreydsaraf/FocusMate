@@ -131,25 +131,89 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
   const getPersonalityMessage = (context: string) => {
     const messages = {
       encouraging: {
-        start: `Go ${currentAdventurerName}! You've got this! Let's conquer this quest together! 🌟`,
-        complete: `Amazing work, ${currentAdventurerName}! ${currentCompanionName} is so proud of your dedication! You're unstoppable! 🎉`,
-        break: `Fantastic job! Time to recharge your magical energy and celebrate your progress! ⚡`,
+        start: [
+          `Go ${currentAdventurerName}! You've got this! Let's conquer this quest together! 🌟`,
+          `You're absolutely amazing, ${currentAdventurerName}! ${currentCompanionName} believes in your incredible strength! 💪`,
+          `Time to shine, ${currentAdventurerName}! I'm here cheering you on every step of the way! ⚡`,
+          `You're unstoppable, ${currentAdventurerName}! Let's show this challenge what we're made of! 🔥`,
+          `Ready to be awesome, ${currentAdventurerName}? ${currentCompanionName} knows you'll crush this! 🚀`,
+        ],
+        complete: [
+          `Amazing work, ${currentAdventurerName}! ${currentCompanionName} is so proud of your dedication! You're unstoppable! 🎉`,
+          `INCREDIBLE job, ${currentAdventurerName}! You just proved how powerful you are! Victory is yours! 🏆`,
+          `Outstanding, ${currentAdventurerName}! ${currentCompanionName} is bursting with pride! You're a true champion! ⭐`,
+          `Phenomenal work, ${currentAdventurerName}! You've shown such determination and strength! 💎`,
+          `Absolutely brilliant, ${currentAdventurerName}! ${currentCompanionName} couldn't be more impressed! 🌟`,
+        ],
+        break: [
+          `Fantastic job! Time to recharge your magical energy and celebrate your progress! ⚡`,
+          `You've earned this break, ${currentAdventurerName}! Bask in the glory of your achievement! 🌟`,
+          `Victory celebration time! ${currentCompanionName} is so excited about your success! 🎊`,
+          `Time to power up, champion! You've been absolutely incredible! 💪`,
+          `Rest like the hero you are, ${currentAdventurerName}! Your energy will return even stronger! ✨`,
+        ],
       },
       gentle: {
-        start: `Take a deep breath, ${currentAdventurerName}. Let's focus together peacefully and mindfully 🌸`,
-        complete: `Well done, ${currentAdventurerName}. ${currentCompanionName} believes in you and your gentle strength 💙`,
-        break: `Rest peacefully, dear adventurer. You've earned this moment of tranquility 🌙`,
+        start: [
+          `Take a deep breath, ${currentAdventurerName}. Let's focus together peacefully and mindfully 🌸`,
+          `Find your center, dear ${currentAdventurerName}. ${currentCompanionName} is here to guide you gently 🕯️`,
+          `Let's move with intention and grace, ${currentAdventurerName}. Peace flows through you 🌙`,
+          `Breathe in calm, breathe out focus, ${currentAdventurerName}. We'll walk this path together serenely 🍃`,
+          `Gentle strength lives within you, ${currentAdventurerName}. ${currentCompanionName} holds space for your journey 🌺`,
+        ],
+        complete: [
+          `Well done, ${currentAdventurerName}. ${currentCompanionName} believes in you and your gentle strength 💙`,
+          `Beautiful work, dear ${currentAdventurerName}. Your mindful effort has blossomed into success 🌸`,
+          `Peace and accomplishment flow through you, ${currentAdventurerName}. ${currentCompanionName} honors your dedication 🕊️`,
+          `Your gentle persistence has borne fruit, ${currentAdventurerName}. Feel the quiet satisfaction within 🌿`,
+          `Gracefully done, ${currentAdventurerName}. ${currentCompanionName} witnesses your inner light shining bright ✨`,
+        ],
+        break: [
+          `Rest peacefully, dear adventurer. You've earned this moment of tranquility 🌙`,
+          `Let serenity wash over you, ${currentAdventurerName}. ${currentCompanionName} watches over your rest 🌊`,
+          `Breathe deeply and release, ${currentAdventurerName}. This quiet moment is yours to cherish 🍃`,
+          `Find stillness in this pause, dear ${currentAdventurerName}. Peace surrounds you like gentle mist 🌸`,
+          `Rest in the garden of your accomplishment, ${currentAdventurerName}. ${currentCompanionName} tends to your peace 🌺`,
+        ],
       },
       playful: {
-        start: `Adventure time, ${currentAdventurerName}! Let's make this quest fun and exciting! Ready to play? 🎮`,
-        complete: `Woohoo! ${currentAdventurerName} and ${currentCompanionName} make an absolutely awesome team! Victory dance time! 🚀`,
-        break: `Play time! Let's recharge with some fun and get ready for the next exciting quest! 🎈`,
+        start: [
+          `Adventure time, ${currentAdventurerName}! Let's make this quest fun and exciting! Ready to play? 🎮`,
+          `Hero ${currentAdventurerName}, your epic journey begins! ${currentCompanionName} is your trusty sidekick! 🗡️`,
+          `Level up time, ${currentAdventurerName}! Let's turn this into the most fun quest ever! 🎯`,
+          `Game on, brave ${currentAdventurerName}! ${currentCompanionName} has loaded your adventure - let's go! 🚀`,
+          `Quest activated, ${currentAdventurerName}! Time to collect some XP and have a blast doing it! ⚡`,
+        ],
+        complete: [
+          `Woohoo! ${currentAdventurerName} and ${currentCompanionName} make an absolutely awesome team! Victory dance time! 🚀`,
+          `LEVEL UP! ${currentAdventurerName} just earned major XP! ${currentCompanionName} is doing victory flips! 🎮`,
+          `Quest completed! ${currentAdventurerName}, you're officially a legend! Time for the victory parade! 🎊`,
+          `BOOM! ${currentAdventurerName} just crushed that challenge! ${currentCompanionName} is throwing confetti! 🎉`,
+          `Achievement unlocked! ${currentAdventurerName} the Magnificent! ${currentCompanionName} is so proud! 🏆`,
+        ],
+        break: [
+          `Play time! Let's recharge with some fun and get ready for the next exciting quest! 🎈`,
+          `Intermission time, ${currentAdventurerName}! ${currentCompanionName} suggests a victory snack! 🍪`,
+          `Side quest: Relaxation Mode activated! Time to power up for the next adventure! 🎮`,
+          `Break time mini-game! ${currentAdventurerName}, you've unlocked the 'Chill Zone' achievement! 🌟`,
+          `Checkpoint reached! ${currentAdventurerName}, save your progress and enjoy this fun break! 🎯`,
+        ],
       },
     }
-    return (
-      messages[companionPersonality as keyof typeof messages]?.[context as keyof typeof messages.encouraging] ||
-      `Great job, ${currentAdventurerName}! Keep up the amazing work!`
-    )
+
+    const personalityMessages = messages[companionPersonality as keyof typeof messages]
+    if (!personalityMessages) {
+      return `Great job, ${currentAdventurerName}! Keep up the amazing work!`
+    }
+
+    const contextMessages = personalityMessages[context as keyof typeof personalityMessages]
+    if (!contextMessages || !Array.isArray(contextMessages)) {
+      return `Great job, ${currentAdventurerName}! Keep up the amazing work!`
+    }
+
+    // Randomly select a message from the array
+    const randomIndex = Math.floor(Math.random() * contextMessages.length)
+    return contextMessages[randomIndex]
   }
 
   useEffect(() => {
