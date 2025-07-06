@@ -8,7 +8,6 @@ import {
   RotateCcw,
   Coffee,
   Settings,
-  Zap,
   CheckCircle,
   Star,
   Target,
@@ -16,6 +15,7 @@ import {
   Moon,
   Music,
   HelpCircle,
+  Gem,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,9 +23,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import AmbientSounds from "./ambient-sounds"
 import HelpGuide from "./help-guide"
 
-type TimerMode = "pomodoro" | "break" | "quickwin" | "custom" | "dragon-slaying"
+type TimerMode = "pomodoro" | "break" | "quickwin" | "custom" | "dragon-slaying" | "treasure-hunt"
 type TimerState = "idle" | "running" | "paused" | "completed"
 type Theme = "light" | "dark"
+
+interface Treasure {
+  id: string
+  name: string
+  sessions: number
+  completed: boolean
+}
 
 interface PomodoroTimerProps {
   adventurerName: string
@@ -52,8 +59,6 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
   // Task management
   const [frogTask, setFrogTask] = useState("")
   const [frogCompleted, setFrogCompleted] = useState(false)
-  const [quickWins, setQuickWins] = useState<string[]>([])
-  const [newQuickWin, setNewQuickWin] = useState("")
   const [completedQuickWins, setCompletedQuickWins] = useState(0)
 
   // Character celebration state
@@ -70,6 +75,20 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
   const [isDragonActive, setIsDragonActive] = useState(false)
   const [showDragonDurationSelect, setShowDragonDurationSelect] = useState(false)
   const [dragonDuration, setDragonDuration] = useState(25)
+
+  // Treasure hunting state
+  const [treasures, setTreasures] = useState<Treasure[]>([])
+  const [newTreasure, setNewTreasure] = useState("")
+  const [activeTreasure, setActiveTreasure] = useState<Treasure | null>(null)
+  const [showTreasureDurationSelect, setShowTreasureDurationSelect] = useState(false)
+  const [selectedTreasureId, setSelectedTreasureId] = useState<string | null>(null)
+  const [treasureDuration, setTreasureDuration] = useState(2)
+
+  // Treasure selection state
+  const [showTreasureSelection, setShowTreasureSelection] = useState(false)
+  const [treasureSelectionMode, setTreasureSelectionMode] = useState<"select" | "add" | "edit">("select")
+  const [editingTreasureId, setEditingTreasureId] = useState<string | null>(null)
+  const [editingTreasureName, setEditingTreasureName] = useState("")
 
   // Name editing state
   const [editingNames, setEditingNames] = useState(false)
@@ -90,6 +109,8 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
         return customFocus * 60
       case "dragon-slaying":
         return dragonDuration * 60
+      case "treasure-hunt":
+        return treasureDuration * 60
       default:
         return 25 * 60
     }
@@ -110,24 +131,24 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
   const getPersonalityMessage = (context: string) => {
     const messages = {
       encouraging: {
-        start: `Go ${currentAdventurerName}! You've got this! 🌟`,
-        complete: `Amazing work, ${currentAdventurerName}! ${currentCompanionName} is so proud! 🎉`,
-        break: `Great job! Time to recharge your magical energy! ⚡`,
+        start: `Go ${currentAdventurerName}! You've got this! Let's conquer this quest together! 🌟`,
+        complete: `Amazing work, ${currentAdventurerName}! ${currentCompanionName} is so proud of your dedication! You're unstoppable! 🎉`,
+        break: `Fantastic job! Time to recharge your magical energy and celebrate your progress! ⚡`,
       },
       gentle: {
-        start: `Take a deep breath, ${currentAdventurerName}. Let's focus together 🌸`,
-        complete: `Well done, ${currentAdventurerName}. ${currentCompanionName} believes in you 💙`,
-        break: `Rest peacefully, dear adventurer. You've earned it 🌙`,
+        start: `Take a deep breath, ${currentAdventurerName}. Let's focus together peacefully and mindfully 🌸`,
+        complete: `Well done, ${currentAdventurerName}. ${currentCompanionName} believes in you and your gentle strength 💙`,
+        break: `Rest peacefully, dear adventurer. You've earned this moment of tranquility 🌙`,
       },
       playful: {
-        start: `Adventure time, ${currentAdventurerName}! Let's make this fun! 🎮`,
-        complete: `Woohoo! ${currentAdventurerName} and ${currentCompanionName} make an awesome team! 🚀`,
-        break: `Play time! Let's recharge for the next quest! 🎈`,
+        start: `Adventure time, ${currentAdventurerName}! Let's make this quest fun and exciting! Ready to play? 🎮`,
+        complete: `Woohoo! ${currentAdventurerName} and ${currentCompanionName} make an absolutely awesome team! Victory dance time! 🚀`,
+        break: `Play time! Let's recharge with some fun and get ready for the next exciting quest! 🎈`,
       },
     }
     return (
       messages[companionPersonality as keyof typeof messages]?.[context as keyof typeof messages.encouraging] ||
-      `Great job, ${currentAdventurerName}!`
+      `Great job, ${currentAdventurerName}! Keep up the amazing work!`
     )
   }
 
@@ -200,12 +221,20 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
   }
 
   const switchMode = (newMode: TimerMode) => {
+    if (newMode === "quickwin" && activeTreasures.length > 0) {
+      // Show treasure selection instead of directly switching
+      setShowTreasureSelection(true)
+      setTreasureSelectionMode("select")
+      return
+    }
+
     setMode(newMode)
     setTimeLeft(getInitialTime(newMode))
     setTimerState("idle")
     setCelebrating(false)
   }
 
+  // Dragon slaying functions
   const startDragonSlaying = (duration: number) => {
     setDragonDuration(duration)
     setMode("dragon-slaying")
@@ -238,18 +267,128 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
     setTimeout(() => setCelebrating(false), 2000)
   }
 
-  const addQuickWin = () => {
-    if (newQuickWin.trim()) {
-      setQuickWins([...quickWins, newQuickWin.trim()])
-      setNewQuickWin("")
+  // Treasure hunting functions
+  const addTreasure = () => {
+    if (newTreasure.trim()) {
+      const treasure: Treasure = {
+        id: Date.now().toString(),
+        name: newTreasure.trim(),
+        sessions: 0,
+        completed: false,
+      }
+      setTreasures([...treasures, treasure])
+      setNewTreasure("")
     }
   }
 
-  const completeQuickWin = (index: number) => {
-    setQuickWins(quickWins.filter((_, i) => i !== index))
-    setCompletedQuickWins((prev) => prev + 1)
-    setCelebrating(true)
-    setTimeout(() => setCelebrating(false), 1500)
+  const startTreasureHunt = (treasureId: string, duration: number) => {
+    const treasure = treasures.find((t) => t.id === treasureId)
+    if (treasure) {
+      setTreasureDuration(duration)
+      setMode("treasure-hunt")
+      setTimeLeft(duration * 60)
+      setTimerState("idle")
+      setActiveTreasure(treasure)
+      setShowTreasureDurationSelect(false)
+      setSelectedTreasureId(null)
+      setCelebrating(false)
+    }
+  }
+
+  const completeTreasureHunt = () => {
+    if (activeTreasure) {
+      setTreasures((prev) =>
+        prev.map((t) => (t.id === activeTreasure.id ? { ...t, sessions: t.sessions + 1, completed: true } : t)),
+      )
+      setCompletedQuickWins((prev) => prev + 1)
+      setActiveTreasure(null)
+      setMode("pomodoro")
+      setTimeLeft(25 * 60)
+      setTimerState("idle")
+      setCelebrating(true)
+      setTimeout(() => setCelebrating(false), 2000)
+    }
+  }
+
+  const cancelTreasureHunt = () => {
+    setActiveTreasure(null)
+    setMode("pomodoro")
+    setTimeLeft(25 * 60)
+    setTimerState("idle")
+  }
+
+  const switchTreasure = (treasureId: string) => {
+    const treasure = treasures.find((t) => t.id === treasureId)
+    if (treasure && !treasure.completed) {
+      setActiveTreasure(treasure)
+      // Keep current timer running but switch the active treasure
+    }
+  }
+
+  const deleteTreasure = (treasureId: string) => {
+    setTreasures((prev) => prev.filter((t) => t.id !== treasureId))
+    if (activeTreasure?.id === treasureId) {
+      setActiveTreasure(null)
+      setMode("pomodoro")
+      setTimeLeft(25 * 60)
+      setTimerState("idle")
+    }
+  }
+
+  const startTreasureSelection = (treasureId: string) => {
+    setSelectedTreasureId(treasureId)
+    setShowTreasureDurationSelect(true)
+    setShowTreasureSelection(false)
+  }
+
+  const editTreasureFromSelection = (treasureId: string) => {
+    const treasure = treasures.find((t) => t.id === treasureId)
+    if (treasure) {
+      setEditingTreasureId(treasureId)
+      setEditingTreasureName(treasure.name)
+      setTreasureSelectionMode("edit")
+    }
+  }
+
+  const saveTreasureEdit = () => {
+    if (editingTreasureId && editingTreasureName.trim()) {
+      setTreasures((prev) =>
+        prev.map((t) => (t.id === editingTreasureId ? { ...t, name: editingTreasureName.trim() } : t)),
+      )
+      setEditingTreasureId(null)
+      setEditingTreasureName("")
+      setTreasureSelectionMode("select")
+    }
+  }
+
+  const cancelTreasureEdit = () => {
+    setEditingTreasureId(null)
+    setEditingTreasureName("")
+    setTreasureSelectionMode("select")
+  }
+
+  const deleteTreasureFromSelection = (treasureId: string) => {
+    setTreasures((prev) => prev.filter((t) => t.id !== treasureId))
+    if (activeTreasure?.id === treasureId) {
+      setActiveTreasure(null)
+      setMode("pomodoro")
+      setTimeLeft(25 * 60)
+      setTimerState("idle")
+    }
+  }
+
+  const addTreasureFromSelection = () => {
+    if (newTreasure.trim()) {
+      const treasure: Treasure = {
+        id: Date.now().toString(),
+        name: newTreasure.trim(),
+        sessions: 0,
+        completed: false,
+      }
+      setTreasures([...treasures, treasure])
+      setNewTreasure("")
+      setTreasureSelectionMode("select")
+    }
   }
 
   const toggleTheme = () => {
@@ -268,6 +407,7 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
         quickwin: "bg-purple-400",
         custom: "bg-blue-400",
         "dragon-slaying": "bg-orange-500",
+        "treasure-hunt": "bg-purple-500",
       },
       light: {
         pomodoro: "bg-red-500",
@@ -275,6 +415,7 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
         quickwin: "bg-violet-500",
         custom: "bg-sky-500",
         "dragon-slaying": "bg-orange-600",
+        "treasure-hunt": "bg-purple-600",
       },
     }
 
@@ -300,6 +441,9 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
       return "bg-white/30 backdrop-blur-xl border-white/40 shadow-xl"
     }
   }
+
+  const activeTreasures = treasures.filter((t) => !t.completed)
+  const completedTreasures = treasures.filter((t) => t.completed)
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -384,12 +528,44 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
             }}
           />
         ))}
+
+        {/* Sparkling effects for treasure hunt mode */}
+        {mode === "treasure-hunt" && activeTreasure && (
+          <>
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={`sparkle-${i}`}
+                className={`absolute ${theme === "dark" ? "text-purple-300" : "text-purple-500"}`}
+                style={{
+                  left: `${20 + Math.random() * 60}%`,
+                  top: `${20 + Math.random() * 60}%`,
+                }}
+                animate={{
+                  scale: [0, 1, 0],
+                  rotate: [0, 180, 360],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  delay: i * 0.3,
+                }}
+              >
+                <Star className="w-3 h-3 fill-current" />
+              </motion.div>
+            ))}
+          </>
+        )}
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto p-4">
         {/* Header with Theme Toggle */}
-        <div className="flex justify-between items-center mb-6 pt-4">
-          <div className="text-center flex-1">
+        <div className="grid grid-cols-3 items-center mb-6 pt-4">
+          {/* Left spacer for balance */}
+          <div></div>
+
+          {/* Centered header content */}
+          <div className="text-center">
             <motion.h1
               className={`text-4xl font-bold ${getTextColor()} drop-shadow-lg mb-2`}
               animate={celebrating ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}}
@@ -402,35 +578,38 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
             </p>
           </div>
 
-          <Button
-            onClick={toggleTheme}
-            size="lg"
-            className={`rounded-full w-12 h-12 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200`}
-          >
-            <motion.div whileHover={{ rotate: 180 }} transition={{ duration: 0.3 }}>
-              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </motion.div>
-          </Button>
+          {/* Right side buttons - made smaller */}
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={toggleTheme}
+              size="sm"
+              className={`rounded-full w-10 h-10 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200`}
+            >
+              <motion.div whileHover={{ rotate: 180 }} transition={{ duration: 0.3 }}>
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </motion.div>
+            </Button>
 
-          <Button
-            onClick={() => setShowAmbientSounds(true)}
-            size="lg"
-            className={`rounded-full w-12 h-12 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200 ml-2`}
-          >
-            <motion.div whileHover={{ rotate: 15 }} transition={{ duration: 0.3 }}>
-              <Music className="w-5 h-5" />
-            </motion.div>
-          </Button>
+            <Button
+              onClick={() => setShowAmbientSounds(true)}
+              size="sm"
+              className={`rounded-full w-10 h-10 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200`}
+            >
+              <motion.div whileHover={{ rotate: 15 }} transition={{ duration: 0.3 }}>
+                <Music className="w-4 h-4" />
+              </motion.div>
+            </Button>
 
-          <Button
-            onClick={() => setShowHelpGuide(true)}
-            size="lg"
-            className={`rounded-full w-12 h-12 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200 ml-2`}
-          >
-            <motion.div whileHover={{ scale: 1.1 }} transition={{ duration: 0.3 }}>
-              <HelpCircle className="w-5 h-5" />
-            </motion.div>
-          </Button>
+            <Button
+              onClick={() => setShowHelpGuide(true)}
+              size="sm"
+              className={`rounded-full w-10 h-10 ${getCardClasses()} border-0 ${getTextColor()} hover:scale-110 transition-all duration-200`}
+            >
+              <motion.div whileHover={{ scale: 1.1 }} transition={{ duration: 0.3 }}>
+                <HelpCircle className="w-4 h-4" />
+              </motion.div>
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -601,52 +780,375 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
               </CardContent>
             </Card>
 
-            {/* Quick Wins */}
+            {/* Treasure Collection */}
             <Card className={getCardClasses()}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className={`w-5 h-5 ${getTextColor()}`} />
+                  <Gem className={`w-5 h-5 ${getTextColor()}`} />
                   <h3 className={`font-bold ${getTextColor()}`}>💎 Treasure Collection</h3>
                   <span
                     className={`text-xs ${theme === "dark" ? "bg-white/20" : "bg-white/30"} px-2 py-1 rounded-full ${getTextColor()}`}
                   >
-                    {completedQuickWins} treasures
+                    {completedTreasures.length} collected
                   </span>
                 </div>
+
+                {/* Add new treasure */}
                 <div className="space-y-2 mb-3">
                   <div className="flex gap-2">
                     <Input
-                      value={newQuickWin}
-                      onChange={(e) => setNewQuickWin(e.target.value)}
-                      placeholder="2-minute treasure hunt..."
+                      value={newTreasure}
+                      onChange={(e) => setNewTreasure(e.target.value)}
+                      placeholder="New treasure to collect..."
                       className={`${theme === "dark" ? "bg-white/10 border-white/20 text-white placeholder:text-white/60" : "bg-white/20 border-white/30 text-gray-800 placeholder:text-gray-600"} text-sm`}
-                      onKeyPress={(e) => e.key === "Enter" && addQuickWin()}
+                      onKeyPress={(e) => e.key === "Enter" && addTreasure()}
                     />
-                    <Button onClick={addQuickWin} size="sm" className="bg-purple-600 hover:bg-purple-700">
+                    <Button onClick={addTreasure} size="sm" className="bg-purple-600 hover:bg-purple-700">
                       +
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {quickWins.map((task, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`flex items-center gap-2 ${theme === "dark" ? "bg-white/5" : "bg-white/20"} p-2 rounded text-sm`}
-                    >
-                      <span className={`flex-1 ${getTextColor()}`}>{task}</span>
+
+                {/* Active treasure hunt indicator */}
+                {activeTreasure && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`${theme === "dark" ? "bg-purple-600/20" : "bg-purple-200/30"} rounded-lg p-3 mb-3 space-y-2`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <motion.span
+                        className="text-2xl"
+                        animate={{ rotate: [0, 15, -15, 0] }}
+                        transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+                      >
+                        💎
+                      </motion.span>
+                      <span className={`font-medium ${getTextColor()}`}>Treasure Hunt in Progress!</span>
+                    </div>
+                    <p className={`text-sm ${getTextColor()} opacity-80`}>Hunting: {activeTreasure.name}</p>
+                    <div className="flex gap-2">
                       <Button
-                        onClick={() => completeQuickWin(index)}
+                        onClick={completeTreasureHunt}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                      >
+                        🏆 Treasure Found!
+                      </Button>
+                      <Button
+                        onClick={cancelTreasureHunt}
+                        size="sm"
+                        variant="ghost"
+                        className={`${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                      >
+                        Stop Hunt
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Treasure Selection Interface */}
+                {showTreasureSelection && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className={`${theme === "dark" ? "bg-purple-600/10" : "bg-purple-200/20"} rounded-lg p-3 mb-3 space-y-3`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className={`font-medium ${getTextColor()}`}>
+                        {treasureSelectionMode === "select" && "🎯 Choose Your Treasure"}
+                        {treasureSelectionMode === "add" && "➕ Add New Treasure"}
+                        {treasureSelectionMode === "edit" && "✏️ Edit Treasure"}
+                      </h4>
+                      <Button
+                        onClick={() => setShowTreasureSelection(false)}
                         size="sm"
                         variant="ghost"
                         className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
                       >
-                        ✓
+                        ×
                       </Button>
+                    </div>
+
+                    {treasureSelectionMode === "select" && (
+                      <div className="space-y-2">
+                        <p className={`text-sm ${getTextColor()} opacity-80`}>Select a treasure to begin your hunt:</p>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {activeTreasures.map((treasure) => (
+                            <motion.div
+                              key={treasure.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className={`flex items-center gap-2 ${theme === "dark" ? "bg-white/5" : "bg-white/20"} p-2 rounded text-sm hover:${theme === "dark" ? "bg-white/10" : "bg-white/30"} transition-colors`}
+                            >
+                              <div className="flex-1">
+                                <span className={`${getTextColor()} font-medium`}>{treasure.name}</span>
+                                {treasure.sessions > 0 && (
+                                  <span
+                                    className={`ml-2 text-xs ${theme === "dark" ? "bg-purple-600/30" : "bg-purple-200/50"} px-1 py-0.5 rounded ${getTextColor()}`}
+                                  >
+                                    {treasure.sessions} sessions
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  onClick={() => startTreasureSelection(treasure.id)}
+                                  size="sm"
+                                  className="h-6 px-2 bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                                >
+                                  Hunt
+                                </Button>
+                                <Button
+                                  onClick={() => editTreasureFromSelection(treasure.id)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                                >
+                                  ✏️
+                                </Button>
+                                <Button
+                                  onClick={() => deleteTreasureFromSelection(treasure.id)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-2 border-t border-white/20">
+                          <Button
+                            onClick={() => setTreasureSelectionMode("add")}
+                            size="sm"
+                            variant="ghost"
+                            className={`flex-1 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                          >
+                            ➕ Add New Treasure
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {treasureSelectionMode === "add" && (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            value={newTreasure}
+                            onChange={(e) => setNewTreasure(e.target.value)}
+                            placeholder="New treasure to collect..."
+                            className={`${theme === "dark" ? "bg-white/10 border-white/20 text-white placeholder:text-white/60" : "bg-white/20 border-white/30 text-gray-800 placeholder:text-gray-600"} text-sm`}
+                            onKeyPress={(e) => e.key === "Enter" && addTreasureFromSelection()}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={addTreasureFromSelection}
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                            disabled={!newTreasure.trim()}
+                          >
+                            Add Treasure
+                          </Button>
+                          <Button
+                            onClick={() => setTreasureSelectionMode("select")}
+                            size="sm"
+                            variant="ghost"
+                            className={`${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                          >
+                            Back
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {treasureSelectionMode === "edit" && (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            value={editingTreasureName}
+                            onChange={(e) => setEditingTreasureName(e.target.value)}
+                            placeholder="Treasure name..."
+                            className={`${theme === "dark" ? "bg-white/10 border-white/20 text-white placeholder:text-white/60" : "bg-white/20 border-white/30 text-gray-800 placeholder:text-gray-600"} text-sm`}
+                            onKeyPress={(e) => e.key === "Enter" && saveTreasureEdit()}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={saveTreasureEdit}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            disabled={!editingTreasureName.trim()}
+                          >
+                            Save Changes
+                          </Button>
+                          <Button
+                            onClick={cancelTreasureEdit}
+                            size="sm"
+                            variant="ghost"
+                            className={`${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Duration selection modal */}
+                {showTreasureDurationSelect && selectedTreasureId && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="space-y-3 border-t border-white/20 pt-3 mb-3"
+                  >
+                    <p className={`text-sm ${getTextColor()} opacity-80`}>Choose hunt duration:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => startTreasureHunt(selectedTreasureId, 2)}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        💎 2 min
+                      </Button>
+                      <Button
+                        onClick={() => startTreasureHunt(selectedTreasureId, 5)}
+                        size="sm"
+                        className="bg-violet-600 hover:bg-violet-700 text-white"
+                      >
+                        ⚡ 5 min
+                      </Button>
+                      <Button
+                        onClick={() => startTreasureHunt(selectedTreasureId, 10)}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        🔮 10 min
+                      </Button>
+                      <Button
+                        onClick={() => startTreasureHunt(selectedTreasureId, 15)}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        🏰 15 min
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        value={treasureDuration}
+                        onChange={(e) => setTreasureDuration(Number(e.target.value))}
+                        placeholder="Custom minutes"
+                        className={`${theme === "dark" ? "bg-white/10 border-white/20 text-white placeholder:text-white/60" : "bg-white/20 border-white/30 text-gray-800 placeholder:text-gray-600"} text-sm`}
+                        min="1"
+                        max="60"
+                      />
+                      <Button
+                        onClick={() => startTreasureHunt(selectedTreasureId, treasureDuration)}
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        Start
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setShowTreasureDurationSelect(false)
+                        setSelectedTreasureId(null)
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className={`w-full ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                    >
+                      Cancel
+                    </Button>
+                  </motion.div>
+                )}
+
+                {/* Active treasures list */}
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {activeTreasures.map((treasure) => (
+                    <motion.div
+                      key={treasure.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`flex items-center gap-2 ${
+                        activeTreasure?.id === treasure.id
+                          ? theme === "dark"
+                            ? "bg-purple-600/20"
+                            : "bg-purple-200/40"
+                          : theme === "dark"
+                            ? "bg-white/5"
+                            : "bg-white/20"
+                      } p-2 rounded text-sm`}
+                    >
+                      <span className={`flex-1 ${getTextColor()}`}>{treasure.name}</span>
+                      {treasure.sessions > 0 && (
+                        <span
+                          className={`text-xs ${theme === "dark" ? "bg-purple-600/30" : "bg-purple-200/50"} px-1 py-0.5 rounded ${getTextColor()}`}
+                        >
+                          {treasure.sessions}
+                        </span>
+                      )}
+                      <div className="flex gap-1">
+                        {activeTreasure?.id === treasure.id ? (
+                          <Button
+                            onClick={() => switchTreasure(treasure.id)}
+                            size="sm"
+                            variant="ghost"
+                            className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                            disabled
+                          >
+                            🎯
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => {
+                              setSelectedTreasureId(treasure.id)
+                              setShowTreasureDurationSelect(true)
+                            }}
+                            size="sm"
+                            variant="ghost"
+                            className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                          >
+                            🏃
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => deleteTreasure(treasure.id)}
+                          size="sm"
+                          variant="ghost"
+                          className={`h-6 w-6 p-0 ${getTextColor()} ${theme === "dark" ? "hover:bg-white/20" : "hover:bg-white/30"}`}
+                        >
+                          ×
+                        </Button>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
+
+                {/* Completed treasures */}
+                {completedTreasures.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/20">
+                    <p className={`text-xs ${getTextColor()} opacity-60 mb-2`}>Collected Treasures:</p>
+                    <div className="space-y-1 max-h-20 overflow-y-auto">
+                      {completedTreasures.map((treasure) => (
+                        <div
+                          key={treasure.id}
+                          className={`flex items-center gap-2 ${theme === "dark" ? "bg-green-600/10" : "bg-green-200/20"} p-1 rounded text-xs`}
+                        >
+                          <CheckCircle className="w-3 h-3 text-green-400" />
+                          <span className={`flex-1 ${getTextColor()} opacity-80`}>{treasure.name}</span>
+                          <span className={`${getTextColor()} opacity-60`}>{treasure.sessions} sessions</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -812,6 +1314,20 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
                   ⚔️ Dragon Battle
                 </Button>
               )}
+              {activeTreasure && (
+                <Button
+                  onClick={() => switchMode("treasure-hunt")}
+                  size="sm"
+                  variant={mode === "treasure-hunt" ? "default" : "outline"}
+                  className={
+                    mode === "treasure-hunt"
+                      ? "bg-purple-600 text-white"
+                      : `${getCardClasses()} ${getTextColor()} border-0`
+                  }
+                >
+                  💎 Treasure Hunt
+                </Button>
+              )}
             </div>
 
             {/* Timer Display */}
@@ -858,6 +1374,37 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
                   </motion.div>
                   <p className={`text-sm ${getTextColor()} opacity-80`}>
                     Session {dragonSessions + 1} • {frogTask}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Treasure Hunt Indicator */}
+              {mode === "treasure-hunt" && activeTreasure && (
+                <motion.div
+                  className={`${theme === "dark" ? "bg-purple-600/20" : "bg-purple-200/30"} rounded-lg p-3 mt-4 text-center`}
+                  animate={{
+                    boxShadow:
+                      timerState === "running"
+                        ? [
+                            "0 0 0 rgba(147, 51, 234, 0.4)",
+                            "0 0 20px rgba(147, 51, 234, 0.6)",
+                            "0 0 0 rgba(147, 51, 234, 0.4)",
+                          ]
+                        : "0 0 0 rgba(147, 51, 234, 0.4)",
+                  }}
+                  transition={{ duration: 2, repeat: timerState === "running" ? Number.POSITIVE_INFINITY : 0 }}
+                >
+                  <motion.div
+                    className="flex items-center justify-center gap-2 mb-2"
+                    animate={timerState === "running" ? { scale: [1, 1.05, 1] } : {}}
+                    transition={{ duration: 1.5, repeat: timerState === "running" ? Number.POSITIVE_INFINITY : 0 }}
+                  >
+                    <span className="text-2xl">💎</span>
+                    <span className={`font-bold ${getTextColor()}`}>Treasure Hunt</span>
+                    <span className="text-2xl">🏃</span>
+                  </motion.div>
+                  <p className={`text-sm ${getTextColor()} opacity-80`}>
+                    Session {activeTreasure.sessions + 1} • {activeTreasure.name}
                   </p>
                 </motion.div>
               )}
@@ -935,7 +1482,7 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
                   </div>
                   <div className="flex justify-between">
                     <span>Treasures collected:</span>
-                    <span className="font-bold">{completedQuickWins}</span>
+                    <span className="font-bold">{completedTreasures.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Dragon status:</span>
@@ -1116,7 +1663,9 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
                       ? "Focus spell completed!"
                       : mode === "break"
                         ? "Rest period finished!"
-                        : "Quest completed!"}
+                        : mode === "treasure-hunt"
+                          ? "Treasure hunt completed!"
+                          : "Quest completed!"}
                 </p>
               </motion.div>
             </motion.div>

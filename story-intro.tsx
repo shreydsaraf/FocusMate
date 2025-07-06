@@ -160,56 +160,66 @@ export default function StoryIntro({ onComplete }: StoryIntroProps) {
       title: "The Spirit's Nature",
       scene: "clearing",
       content: (
-        <div className="text-center space-y-6">
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-lg text-white/90">
+        <div className="text-center space-y-4">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-base text-white/90 leading-relaxed px-2"
+          >
             Wonderful! {companionName} glows with magical energy. But every Focus Spirit has a unique personality. What
             kind of companion do you need on this journey?
           </motion.p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
             <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
               <Button
                 onClick={() => selectPersonality("encouraging")}
-                className="w-full h-24 bg-yellow-600 hover:bg-yellow-700 text-white flex flex-col items-center justify-center space-y-2"
+                className="w-full h-22 bg-yellow-600 hover:bg-yellow-700 text-white flex flex-col items-center justify-center space-y-0.5 p-3"
               >
-                <span className="text-2xl">🌟</span>
-                <span className="font-bold">Encouraging</span>
-                <span className="text-xs opacity-80">Cheers you on with enthusiasm</span>
+                <span className="text-xl">🌟</span>
+                <span className="font-bold text-sm">Encouraging</span>
+                <span className="text-xs opacity-80 leading-tight text-center px-1">Cheers you on with enthusiasm</span>
               </Button>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
               <Button
                 onClick={() => selectPersonality("gentle")}
-                className="w-full h-24 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center justify-center space-y-2"
+                className="w-full h-22 bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center justify-center space-y-0.5 p-3"
               >
-                <span className="text-2xl">🌸</span>
-                <span className="font-bold">Gentle</span>
-                <span className="text-xs opacity-80">Offers calm, peaceful guidance</span>
+                <span className="text-xl">🌸</span>
+                <span className="font-bold text-sm">Gentle</span>
+                <span className="text-xs opacity-80 leading-tight text-center px-1">
+                  Offers calm, peaceful guidance
+                </span>
               </Button>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.9 }}>
               <Button
                 onClick={() => selectPersonality("playful")}
-                className="w-full h-24 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center justify-center space-y-2"
+                className="w-full h-22 bg-purple-600 hover:bg-purple-700 text-white flex flex-col items-center justify-center space-y-0.5 p-3"
               >
-                <span className="text-2xl">🎮</span>
-                <span className="font-bold">Playful</span>
-                <span className="text-xs opacity-80">Makes productivity fun and engaging</span>
+                <span className="text-xl">🎮</span>
+                <span className="font-bold text-sm">Playful</span>
+                <span className="text-xs opacity-80 leading-tight text-center px-1">
+                  Makes productivity fun and engaging
+                </span>
               </Button>
             </motion.div>
           </div>
 
           {companionPersonality && (
-            <motion.p
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-white/90 bg-white/20 rounded-lg p-4 mt-4"
+              className="text-white/90 bg-white/20 rounded-lg p-3 mt-4 mx-2"
             >
-              Perfect choice! {companionName} radiates {companionPersonality} energy and is ready to help you succeed!
-              ✨
-            </motion.p>
+              <p className="text-sm leading-relaxed">
+                Perfect choice! {companionName} radiates {companionPersonality} energy and is ready to help you succeed!
+                ✨
+              </p>
+            </motion.div>
           )}
         </div>
       ),
