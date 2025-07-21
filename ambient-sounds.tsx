@@ -37,6 +37,8 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
   const [selectedSound, setSelectedSound] = useState<SoundType>("none")
   const [volume, setVolume] = useState([50])
   const [isPlaying, setIsPlaying] = useState(false)
+  const [audioContextState, setAudioContextState] = useState<"suspended" | "running" | "closed">("suspended")
+  const [isMobile, setIsMobile] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const gainNodeRef = useRef<GainNode | null>(null)
@@ -80,17 +82,59 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
     return theme === "dark" ? "text-white" : "text-gray-800"
   }
 
-  // Initialize Web Audio Context
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(
+        window.innerWidth <= 768 ||
+          /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      )
+    }
+
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
+  // Initialize Web Audio Context with mobile support
   useEffect(() => {
     if (typeof window !== "undefined") {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
-      gainNodeRef.current = audioContextRef.current.createGain()
-      gainNodeRef.current.connect(audioContextRef.current.destination)
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+        if (AudioContext) {
+          audioContextRef.current = new AudioContext()
+          gainNodeRef.current = audioContextRef.current.createGain()
+          gainNodeRef.current.connect(audioContextRef.current.destination)
+
+          // Set initial volume
+          gainNodeRef.current.gain.value = volume[0] / 100
+
+          // Track audio context state
+          setAudioContextState(audioContextRef.current.state)
+
+          // Listen for state changes
+          const handleStateChange = () => {
+            if (audioContextRef.current) {
+              setAudioContextState(audioContextRef.current.state)
+            }
+          }
+
+          audioContextRef.current.addEventListener("statechange", handleStateChange)
+
+          return () => {
+            if (audioContextRef.current) {
+              audioContextRef.current.removeEventListener("statechange", handleStateChange)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize AudioContext:", error)
+      }
     }
 
     return () => {
       stopAllSounds()
-      if (audioContextRef.current) {
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         audioContextRef.current.close()
       }
     }
@@ -103,30 +147,52 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
     }
   }, [volume])
 
-  const createWhiteNoise = () => {
-    if (!audioContextRef.current) return null
-
-    const bufferSize = audioContextRef.current.sampleRate * 2
-    const noiseBuffer = audioContextRef.current.createBuffer(1, bufferSize, audioContextRef.current.sampleRate)
-    const output = noiseBuffer.getChannelData(0)
-
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1
+  // Resume audio context on user interaction (required for mobile)
+  const resumeAudioContext = async () => {
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+      try {
+        await audioContextRef.current.resume()
+        setAudioContextState(audioContextRef.current.state)
+      } catch (error) {
+        console.error("Failed to resume AudioContext:", error)
+      }
     }
+  }
 
-    const whiteNoise = audioContextRef.current.createBufferSource()
-    whiteNoise.buffer = noiseBuffer
-    whiteNoise.loop = true
-    return whiteNoise
+  const createWhiteNoise = () => {
+    if (!audioContextRef.current || audioContextRef.current.state !== "running") return null
+
+    try {
+      const bufferSize = audioContextRef.current.sampleRate * 2
+      const noiseBuffer = audioContextRef.current.createBuffer(1, bufferSize, audioContextRef.current.sampleRate)
+      const output = noiseBuffer.getChannelData(0)
+
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1
+      }
+
+      const whiteNoise = audioContextRef.current.createBufferSource()
+      whiteNoise.buffer = noiseBuffer
+      whiteNoise.loop = true
+      return whiteNoise
+    } catch (error) {
+      console.error("Failed to create white noise:", error)
+      return null
+    }
   }
 
   const createTone = (frequency: number, type: OscillatorType = "sine") => {
-    if (!audioContextRef.current) return null
+    if (!audioContextRef.current || audioContextRef.current.state !== "running") return null
 
-    const oscillator = audioContextRef.current.createOscillator()
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime)
-    return oscillator
+    try {
+      const oscillator = audioContextRef.current.createOscillator()
+      oscillator.type = type
+      oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime)
+      return oscillator
+    } catch (error) {
+      console.error("Failed to create tone:", error)
+      return null
+    }
   }
 
   const stopAllSounds = () => {
@@ -151,8 +217,16 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
     }
   }
 
-  const playSound = (soundType: SoundType) => {
+  const playSound = async (soundType: SoundType) => {
     if (!audioContextRef.current || !gainNodeRef.current) return
+
+    // Resume audio context if suspended (required for mobile)
+    await resumeAudioContext()
+
+    if (audioContextRef.current.state !== "running") {
+      console.warn("AudioContext is not running")
+      return
+    }
 
     stopAllSounds()
 
@@ -161,172 +235,185 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
       return
     }
 
-    const ctx = audioContextRef.current
-    const gainNode = gainNodeRef.current
+    try {
+      const ctx = audioContextRef.current
+      const gainNode = gainNodeRef.current
 
-    switch (soundType) {
-      case "enchanted-forest":
-        // White noise filtered for forest sounds
-        const forestNoise = createWhiteNoise()
-        if (forestNoise) {
-          const forestFilter = ctx.createBiquadFilter()
-          forestFilter.type = "lowpass"
-          forestFilter.frequency.value = 800
-          forestNoise.connect(forestFilter)
-          forestFilter.connect(gainNode)
-          forestNoise.start()
-          noiseNodeRef.current = forestNoise
-        }
-        break
+      switch (soundType) {
+        case "enchanted-forest":
+          // White noise filtered for forest sounds
+          const forestNoise = createWhiteNoise()
+          if (forestNoise) {
+            const forestFilter = ctx.createBiquadFilter()
+            forestFilter.type = "lowpass"
+            forestFilter.frequency.value = 800
+            forestNoise.connect(forestFilter)
+            forestFilter.connect(gainNode)
+            forestNoise.start()
+            noiseNodeRef.current = forestNoise
+          }
+          break
 
-      case "mystical-rain":
-        // High-frequency filtered white noise
-        const rainNoise = createWhiteNoise()
-        if (rainNoise) {
-          const rainFilter = ctx.createBiquadFilter()
-          rainFilter.type = "highpass"
-          rainFilter.frequency.value = 1000
-          const rainGain = ctx.createGain()
-          rainGain.gain.value = 0.3
-          rainNoise.connect(rainFilter)
-          rainFilter.connect(rainGain)
-          rainGain.connect(gainNode)
-          rainNoise.start()
-          noiseNodeRef.current = rainNoise
-        }
-        break
+        case "mystical-rain":
+          // High-frequency filtered white noise
+          const rainNoise = createWhiteNoise()
+          if (rainNoise) {
+            const rainFilter = ctx.createBiquadFilter()
+            rainFilter.type = "highpass"
+            rainFilter.frequency.value = 1000
+            const rainGain = ctx.createGain()
+            rainGain.gain.value = 0.3
+            rainNoise.connect(rainFilter)
+            rainFilter.connect(rainGain)
+            rainGain.connect(gainNode)
+            rainNoise.start()
+            noiseNodeRef.current = rainNoise
+          }
+          break
 
-      case "crackling-fire":
-        // Low-frequency noise with random pops
-        const fireNoise = createWhiteNoise()
-        if (fireNoise) {
-          const fireFilter = ctx.createBiquadFilter()
-          fireFilter.type = "lowpass"
-          fireFilter.frequency.value = 400
-          const fireGain = ctx.createGain()
-          fireGain.gain.value = 0.4
-          fireNoise.connect(fireFilter)
-          fireFilter.connect(fireGain)
-          fireGain.connect(gainNode)
-          fireNoise.start()
-          noiseNodeRef.current = fireNoise
-        }
-        break
+        case "crackling-fire":
+          // Low-frequency noise with random pops
+          const fireNoise = createWhiteNoise()
+          if (fireNoise) {
+            const fireFilter = ctx.createBiquadFilter()
+            fireFilter.type = "lowpass"
+            fireFilter.frequency.value = 400
+            const fireGain = ctx.createGain()
+            fireGain.gain.value = 0.4
+            fireNoise.connect(fireFilter)
+            fireFilter.connect(fireGain)
+            fireGain.connect(gainNode)
+            fireNoise.start()
+            noiseNodeRef.current = fireNoise
+          }
+          break
 
-      case "ocean-waves":
-        // Low-frequency oscillating noise
-        const waveNoise = createWhiteNoise()
-        const waveLFO = createTone(0.1, "sine")
-        if (waveNoise && waveLFO) {
-          const waveFilter = ctx.createBiquadFilter()
-          waveFilter.type = "lowpass"
-          waveFilter.frequency.value = 600
-          const waveGain = ctx.createGain()
-          const lfoGain = ctx.createGain()
-          lfoGain.gain.value = 0.3
+        case "ocean-waves":
+          // Low-frequency oscillating noise
+          const waveNoise = createWhiteNoise()
+          const waveLFO = createTone(0.1, "sine")
+          if (waveNoise && waveLFO) {
+            const waveFilter = ctx.createBiquadFilter()
+            waveFilter.type = "lowpass"
+            waveFilter.frequency.value = 600
+            const waveGain = ctx.createGain()
+            const lfoGain = ctx.createGain()
+            lfoGain.gain.value = 0.3
 
-          waveLFO.connect(lfoGain)
-          lfoGain.connect(waveGain.gain)
-          waveNoise.connect(waveFilter)
-          waveFilter.connect(waveGain)
-          waveGain.connect(gainNode)
+            waveLFO.connect(lfoGain)
+            lfoGain.connect(waveGain.gain)
+            waveNoise.connect(waveFilter)
+            waveFilter.connect(waveGain)
+            waveGain.connect(gainNode)
 
-          waveNoise.start()
-          waveLFO.start()
-          noiseNodeRef.current = waveNoise
-          oscillatorsRef.current.push(waveLFO)
-        }
-        break
+            waveNoise.start()
+            waveLFO.start()
+            noiseNodeRef.current = waveNoise
+            oscillatorsRef.current.push(waveLFO)
+          }
+          break
 
-      case "mountain-wind":
-        // Mid-frequency filtered noise
-        const windNoise = createWhiteNoise()
-        if (windNoise) {
-          const windFilter = ctx.createBiquadFilter()
-          windFilter.type = "bandpass"
-          windFilter.frequency.value = 500
-          windFilter.Q.value = 0.5
-          const windGain = ctx.createGain()
-          windGain.gain.value = 0.3
-          windNoise.connect(windFilter)
-          windFilter.connect(windGain)
-          windGain.connect(gainNode)
-          windNoise.start()
-          noiseNodeRef.current = windNoise
-        }
-        break
+        case "mountain-wind":
+          // Mid-frequency filtered noise
+          const windNoise = createWhiteNoise()
+          if (windNoise) {
+            const windFilter = ctx.createBiquadFilter()
+            windFilter.type = "bandpass"
+            windFilter.frequency.value = 500
+            windFilter.Q.value = 0.5
+            const windGain = ctx.createGain()
+            windGain.gain.value = 0.3
+            windNoise.connect(windFilter)
+            windFilter.connect(windGain)
+            windGain.connect(gainNode)
+            windNoise.start()
+            noiseNodeRef.current = windNoise
+          }
+          break
 
-      case "gentle-stream":
-        // High-frequency noise with gentle modulation
-        const streamNoise = createWhiteNoise()
-        const streamLFO = createTone(0.3, "sine")
-        if (streamNoise && streamLFO) {
-          const streamFilter = ctx.createBiquadFilter()
-          streamFilter.type = "highpass"
-          streamFilter.frequency.value = 800
-          const streamGain = ctx.createGain()
-          const streamLfoGain = ctx.createGain()
-          streamLfoGain.gain.value = 0.2
+        case "gentle-stream":
+          // High-frequency noise with gentle modulation
+          const streamNoise = createWhiteNoise()
+          const streamLFO = createTone(0.3, "sine")
+          if (streamNoise && streamLFO) {
+            const streamFilter = ctx.createBiquadFilter()
+            streamFilter.type = "highpass"
+            streamFilter.frequency.value = 800
+            const streamGain = ctx.createGain()
+            const streamLfoGain = ctx.createGain()
+            streamLfoGain.gain.value = 0.2
 
-          streamLFO.connect(streamLfoGain)
-          streamLfoGain.connect(streamGain.gain)
-          streamNoise.connect(streamFilter)
-          streamFilter.connect(streamGain)
-          streamGain.connect(gainNode)
+            streamLFO.connect(streamLfoGain)
+            streamLfoGain.connect(streamGain.gain)
+            streamNoise.connect(streamFilter)
+            streamFilter.connect(streamGain)
+            streamGain.connect(gainNode)
 
-          streamNoise.start()
-          streamLFO.start()
-          noiseNodeRef.current = streamNoise
-          oscillatorsRef.current.push(streamLFO)
-        }
-        break
+            streamNoise.start()
+            streamLFO.start()
+            noiseNodeRef.current = streamNoise
+            oscillatorsRef.current.push(streamLFO)
+          }
+          break
 
-      case "wizard-study":
-        // Soft tones with gentle harmonics
-        const tone1 = createTone(220, "sine")
-        const tone2 = createTone(330, "sine")
-        const tone3 = createTone(440, "sine")
-        if (tone1 && tone2 && tone3) {
-          const studyGain1 = ctx.createGain()
-          const studyGain2 = ctx.createGain()
-          const studyGain3 = ctx.createGain()
-          studyGain1.gain.value = 0.1
-          studyGain2.gain.value = 0.08
-          studyGain3.gain.value = 0.06
+        case "wizard-study":
+          // Soft tones with gentle harmonics
+          const tone1 = createTone(220, "sine")
+          const tone2 = createTone(330, "sine")
+          const tone3 = createTone(440, "sine")
+          if (tone1 && tone2 && tone3) {
+            const studyGain1 = ctx.createGain()
+            const studyGain2 = ctx.createGain()
+            const studyGain3 = ctx.createGain()
+            studyGain1.gain.value = 0.1
+            studyGain2.gain.value = 0.08
+            studyGain3.gain.value = 0.06
 
-          tone1.connect(studyGain1)
-          tone2.connect(studyGain2)
-          tone3.connect(studyGain3)
-          studyGain1.connect(gainNode)
-          studyGain2.connect(gainNode)
-          studyGain3.connect(gainNode)
+            tone1.connect(studyGain1)
+            tone2.connect(studyGain2)
+            tone3.connect(studyGain3)
+            studyGain1.connect(gainNode)
+            studyGain2.connect(gainNode)
+            studyGain3.connect(gainNode)
 
-          tone1.start()
-          tone2.start()
-          tone3.start()
-          oscillatorsRef.current.push(tone1, tone2, tone3)
-        }
-        break
+            tone1.start()
+            tone2.start()
+            tone3.start()
+            oscillatorsRef.current.push(tone1, tone2, tone3)
+          }
+          break
 
-      default:
-        // Default to gentle white noise
-        const defaultNoise = createWhiteNoise()
-        if (defaultNoise) {
-          const defaultGain = ctx.createGain()
-          defaultGain.gain.value = 0.2
-          defaultNoise.connect(defaultGain)
-          defaultGain.connect(gainNode)
-          defaultNoise.start()
-          noiseNodeRef.current = defaultNoise
-        }
+        default:
+          // Default to gentle white noise
+          const defaultNoise = createWhiteNoise()
+          if (defaultNoise) {
+            const defaultGain = ctx.createGain()
+            defaultGain.gain.value = 0.2
+            defaultNoise.connect(defaultGain)
+            defaultGain.connect(gainNode)
+            defaultNoise.start()
+            noiseNodeRef.current = defaultNoise
+          }
+      }
+
+      setIsPlaying(true)
+    } catch (error) {
+      console.error("Failed to play sound:", error)
+      setIsPlaying(false)
     }
-
-    setIsPlaying(true)
   }
 
-  const handleSoundSelect = (soundType: SoundType) => {
+  const handleSoundSelect = async (soundType: SoundType) => {
     setSelectedSound(soundType)
-    playSound(soundType)
+    await playSound(soundType)
+  }
+
+  // Handle touch events for mobile
+  const handleTouchStart = async (soundType: SoundType) => {
+    if (isMobile) {
+      await resumeAudioContext()
+    }
+    await handleSoundSelect(soundType)
   }
 
   return (
@@ -358,6 +445,17 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                   </Button>
                 </div>
 
+                {/* Audio Context Status for Mobile */}
+                {isMobile && audioContextState === "suspended" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mb-4 p-3 rounded-lg ${theme === "dark" ? "bg-yellow-900/30 border-yellow-600/50" : "bg-yellow-100/50 border-yellow-400/50"} border text-center`}
+                  >
+                    <p className={`text-sm ${getTextColor()} opacity-80`}>📱 Tap any sound to enable audio on mobile</p>
+                  </motion.div>
+                )}
+
                 {/* Volume Control */}
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-3">
@@ -374,6 +472,7 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                         value={volume[0]}
                         onChange={(e) => setVolume([Number(e.target.value)])}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onTouchStart={resumeAudioContext}
                       />
                     </div>
                     <Volume2 className={`w-4 h-4 ${getTextColor()}`} />
@@ -387,6 +486,7 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                     <motion.button
                       key={sound.id}
                       onClick={() => handleSoundSelect(sound.id)}
+                      onTouchStart={() => handleTouchStart(sound.id)}
                       className={`w-full p-3 rounded-lg text-left transition-all duration-200 ${
                         selectedSound === sound.id
                           ? theme === "dark"
@@ -395,7 +495,7 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                           : theme === "dark"
                             ? "bg-white/5 hover:bg-white/10 border-white/10"
                             : "bg-white/10 hover:bg-white/20 border-white/20"
-                      } border`}
+                      } border touch-manipulation`}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -405,7 +505,7 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                           <div className={`font-medium ${getTextColor()}`}>{sound.name}</div>
                           <div className={`text-xs ${getTextColor()} opacity-70`}>{sound.description}</div>
                         </div>
-                        {selectedSound === sound.id && isPlaying && (
+                        {selectedSound === sound.id && isPlaying && audioContextState === "running" && (
                           <motion.div
                             className={`w-3 h-3 rounded-full ${theme === "dark" ? "bg-purple-400" : "bg-purple-600"}`}
                             animate={{ scale: [1, 1.2, 1] }}
@@ -425,8 +525,20 @@ export default function AmbientSounds({ theme, isVisible, onToggle }: AmbientSou
                     className={`mt-4 p-3 rounded-lg ${theme === "dark" ? "bg-white/10" : "bg-white/20"} text-center`}
                   >
                     <p className={`text-sm ${getTextColor()} opacity-80`}>
-                      Now playing:{" "}
-                      <span className="font-medium">{sounds.find((s) => s.id === selectedSound)?.name}</span>
+                      {audioContextState === "running" && isPlaying ? (
+                        <>
+                          Now playing:{" "}
+                          <span className="font-medium">{sounds.find((s) => s.id === selectedSound)?.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          Selected:{" "}
+                          <span className="font-medium">{sounds.find((s) => s.id === selectedSound)?.name}</span>
+                          {audioContextState === "suspended" && isMobile && (
+                            <span className="block text-xs mt-1 opacity-60">Tap to start audio</span>
+                          )}
+                        </>
+                      )}
                     </p>
                   </motion.div>
                 )}

@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@auth/core": "latest",
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "latest",
@@ -48,11 +49,15 @@
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
+    "next-auth": "latest",
+    "next-plausible": "latest",
     "next-themes": "latest",
+    "nodemailer": "latest",
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "latest",
+    "react-hot-toast": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "sonner": "latest",
