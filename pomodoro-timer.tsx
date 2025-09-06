@@ -146,6 +146,9 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
     totalFocusTime: 0,
   })
 
+  // Current header message state
+  const [currentHeaderMessage, setCurrentHeaderMessage] = useState("")
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Detect orientation and mobile device
@@ -351,6 +354,11 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
     companionPersonality,
   ])
 
+  // Update header message only when mode changes or timer resets
+  useEffect(() => {
+    setCurrentHeaderMessage(getPersonalityMessage("start"))
+  }, [mode, currentAdventurerName, currentCompanionName, companionPersonality])
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -363,6 +371,7 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
     setTimerState("idle")
     setTimeLeft(getInitialTime(mode))
     setCelebrating(false)
+    setCurrentHeaderMessage(getPersonalityMessage("start"))
   }
 
   const switchMode = (newMode: TimerMode) => {
@@ -633,47 +642,6 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
           </svg>
         </div>
 
-        {/* Floating ambient elements */}
-        {[...Array(celebrating ? 12 : 8)].map((_, i) => (
-          <motion.div
-            key={i}
-            className={`absolute rounded-full ${
-              theme === "dark"
-                ? celebrating
-                  ? "bg-yellow-200/20"
-                  : "bg-white/10"
-                : celebrating
-                  ? "bg-orange-200/30"
-                  : "bg-white/20"
-            }`}
-            style={{
-              width: celebrating ? Math.random() * 40 + 20 : Math.random() * 60 + 30,
-              height: celebrating ? Math.random() * 40 + 20 : Math.random() * 60 + 30,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 70}%`,
-            }}
-            animate={
-              celebrating
-                ? {
-                    y: [0, -30, 0],
-                    x: [0, 15, 0],
-                    scale: [1, 1.2, 1],
-                    rotate: [0, 180, 360],
-                  }
-                : {
-                    y: [0, -15, 0],
-                    x: [0, 8, 0],
-                    scale: [1, 1.05, 1],
-                  }
-            }
-            transition={{
-              duration: celebrating ? 1.5 : 4 + Math.random() * 2,
-              repeat: Number.POSITIVE_INFINITY,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-
         {/* Sparkling effects for treasure hunt mode */}
         {mode === "treasure-hunt" && activeTreasure && (
           <>
@@ -725,7 +693,7 @@ export default function PomodoroTimer({ adventurerName, companionName, companion
               🍅 {currentAdventurerName}'s Quest
             </motion.h1>
             <p className={`${getTextColor()} opacity-80 ${orientation === "landscape" && isMobile ? "text-sm" : ""}`}>
-              {currentCompanionName} is here to help! {getPersonalityMessage("start")}
+              {currentCompanionName} is here to help! {currentHeaderMessage}
             </p>
           </div>
 
