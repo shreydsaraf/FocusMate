@@ -22,15 +22,17 @@ FocusMate is a gamified productivity web application designed to make focus sess
 
 ## Live Demo
 
-[Add your Vercel deployment link here]
+https://focus-mate-flax.vercel.app/
 
 ## GitHub Repository
 
-[Add your GitHub repository link here]
+https://github.com/shreydsaraf/FocusMate.git 
 
 ## Screenshots
 
-(Add screenshots here)
+<img width="1278" height="681" alt="image" src="https://github.com/user-attachments/assets/f8c3f50d-5132-438a-8910-63fd6baee45a" />
+<img width="1278" height="680" alt="image" src="https://github.com/user-attachments/assets/8330a7be-d4a1-4ef7-a51c-ec98bf6c3bd1" />
+
 
 ## Learning Outcomes
 
