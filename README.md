@@ -1,30 +1,58 @@
-# Pixar Pomodoro Timer
+# FocusMate – Gamified Productivity Web Application
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+FocusMate is a gamified productivity web application designed to make focus sessions more interactive, engaging, and motivating through Pomodoro-based time management, task tracking, and immersive UI elements.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/shreydsaraf-1778s-projects/v0-pixar-pomodoro-timer)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/sTSC0UDAPeC)
+## Features
 
-## Overview
+* Pomodoro-based productivity timer
+* Gamified focus experience
+* Task and productivity tracking
+* Interactive and responsive user interface
+* User customisation and settings
+* Cloud deployment using Vercel
+* Cross-device responsive design
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## **Technologies** Used
 
-## Deployment
+* React / Next.js
+* JavaScript
+* Vercel
+* GitHub
+* HTML/CSS
 
-Your project is live at:
+## Live Demo
 
-**[https://vercel.com/shreydsaraf-1778s-projects/v0-pixar-pomodoro-timer](https://vercel.com/shreydsaraf-1778s-projects/v0-pixar-pomodoro-timer)**
+[Add your Vercel deployment link here]
 
-## Build your app
+## GitHub Repository
 
-Continue building your app on:
+[Add your GitHub repository link here]
 
-**[https://v0.dev/chat/projects/sTSC0UDAPeC](https://v0.dev/chat/projects/sTSC0UDAPeC)**
+## Screenshots
 
-## How It Works
+(Add screenshots here)
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+## Learning Outcomes
+
+This project helped strengthen my skills in:
+
+* Frontend web development
+* UI/UX design principles
+* Responsive application design
+* Deployment workflows using Vercel
+* Git and version control
+* Building real-world user-focused applications
+* Problem-solving and feature implementation
+
+## Future Improvements
+
+* Authentication and user accounts
+* Productivity analytics dashboard
+* Cloud database integration
+* Enhanced gamification systems
+* Mobile application support
+* Focus statistics and reporting
+
+## Author
+
+Shrey Saraf
